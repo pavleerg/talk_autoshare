@@ -12,7 +12,7 @@ appstore: clean
 	mkdir -p $(build_dir)
 	tar -czf $(build_dir)/$(app_name)-$(version).tar.gz \
 		--exclude=$(build_dir) --exclude=vendor --exclude=tests --exclude='composer.*' \
-		--exclude=Makefile --exclude=.gitignore --exclude=.phpunit.cache \
+		--exclude=Makefile --exclude=.git --exclude=.gitignore --exclude=.phpunit.cache \
 		-C .. $(app_name)
 	@echo "Built $(build_dir)/$(app_name)-$(version).tar.gz"
 

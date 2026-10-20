@@ -14,6 +14,7 @@ use OCP\Files\File;
 use OCP\IRequest;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
 
 // Stand-in for Talk's controller, matched by class name.
@@ -23,6 +24,7 @@ if (!class_exists(\OCA\Talk\Controller\RecordingController::class)) {
 
 class RecordingStoreMiddlewareTest extends TestCase {
 	private AutoShareService&MockObject $service;
+	private ContainerInterface&MockObject $container;
 	private IRequest&MockObject $request;
 	private ITimeFactory&MockObject $timeFactory;
 	private LoggerInterface&MockObject $logger;
@@ -36,7 +38,12 @@ class RecordingStoreMiddlewareTest extends TestCase {
 		$this->logger = $this->createMock(LoggerInterface::class);
 		$config = $this->createMock(Configuration::class);
 		$config->method('isTalkAvailable')->willReturn(true);
-		$this->middleware = new RecordingStoreMiddleware($this->service, $config, $this->request, $this->timeFactory, $this->logger);
+		$this->container = $this->createMock(ContainerInterface::class);
+		$this->container->method('get')->willReturnMap([
+			[AutoShareService::class, $this->service],
+			[Configuration::class, $config],
+		]);
+		$this->middleware = new RecordingStoreMiddleware($this->container, $this->request, $this->timeFactory, $this->logger);
 		$this->talkController = new \OCA\Talk\Controller\RecordingController();
 	}
 
@@ -55,17 +62,17 @@ class RecordingStoreMiddlewareTest extends TestCase {
 
 	public function testIgnoresOtherControllers(): void {
 		$other = new \stdClass();
-		$this->service->expects($this->never())->method('findRecording');
+		$this->container->expects($this->never())->method('get');
 		$this->dispatch($other, 'store');
 	}
 
 	public function testIgnoresOtherMethods(): void {
-		$this->service->expects($this->never())->method('findRecording');
+		$this->container->expects($this->never())->method('get');
 		$this->dispatch($this->talkController, 'requestUpload');
 	}
 
 	public function testIgnoresFailedStore(): void {
-		$this->service->expects($this->never())->method('findRecording');
+		$this->container->expects($this->never())->method('get');
 		$this->dispatch($this->talkController, 'store', Http::STATUS_BAD_REQUEST);
 	}
 

@@ -1,9 +1,11 @@
 /**
- * Switches Talk's recording view (/call/{token}/recording) to grid view.
+ * Switches Talk's recording view (/call/{token}/recording) to grid view and keeps it there.
  *
  * Talk's recording bundle starts with callView.isGrid = false and, unlike the normal UI, never applies
- * the grid default for group calls. Uses Talk 24 internals (Vue 3 app exposed as OCA.Talk.instance,
- * Pinia store "callView"); if they change, the recording silently stays in speaker view.
+ * the grid default for group calls; later joins can reset it too, so the store is watched for the
+ * whole recording. Screen shares (presentationStarted) are left to Talk, which restores the previous
+ * view afterwards. Uses Talk 24 internals (Vue 3 app exposed as OCA.Talk.instance, Pinia store
+ * "callView"); if they change, the recording silently stays in speaker view.
  */
 (function () {
 	const match = window.location.pathname.match(/\/call\/([^/]+)\/recording/)
@@ -11,7 +13,11 @@
 		return
 	}
 	const token = match[1]
-	const deadline = Date.now() + 30000
+	const deadline = Date.now() + 120000
+
+	const applyGrid = (store) => {
+		store.setCallViewMode({ token, isGrid: true, isStripeOpen: true })
+	}
 
 	const timer = setInterval(() => {
 		try {
@@ -20,8 +26,14 @@
 			const store = pinia?._s?.get('callView')
 			if (store) {
 				clearInterval(timer)
-				store.setCallViewMode({ token, isGrid: true, isStripeOpen: true })
+				applyGrid(store)
 				console.info('[talk_autoshare] recording switched to grid view')
+				store.$subscribe(() => {
+					if (!store.isGrid && !store.presentationStarted) {
+						applyGrid(store)
+						console.info('[talk_autoshare] call view was reset, switched back to grid view')
+					}
+				})
 				return
 			}
 		} catch (e) {

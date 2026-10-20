@@ -12,6 +12,7 @@ use OCP\AppFramework\Http\Response;
 use OCP\AppFramework\Middleware;
 use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\IRequest;
+use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -21,6 +22,8 @@ use Psr\Log\LoggerInterface;
  * multipart upload, and the chunked upload (Talk 24+) where the file was assembled through a public
  * WebDAV share beforehand and only `fileName` is posted. Talk has created its "recording stored"
  * notification by then, so it is dismissed right away.
+ *
+ * Being global it is built for every request of every app, so the services are resolved lazily.
  */
 class RecordingStoreMiddleware extends Middleware {
 	/** Talk controller action the recording server calls once a recording is uploaded (::class does not autoload). */
@@ -30,8 +33,7 @@ class RecordingStoreMiddleware extends Middleware {
 	private ?int $startedAt = null;
 
 	public function __construct(
-		private AutoShareService $service,
-		private Configuration $config,
+		private ContainerInterface $container,
 		private IRequest $request,
 		private ITimeFactory $timeFactory,
 		private LoggerInterface $logger,
@@ -63,7 +65,7 @@ class RecordingStoreMiddleware extends Middleware {
 	}
 
 	private function handleStoredRecording(): void {
-		if (!$this->config->isTalkAvailable()) {
+		if (!$this->container->get(Configuration::class)->isTalkAvailable()) {
 			return;
 		}
 		$token = (string)$this->request->getParam('token', '');
@@ -76,17 +78,18 @@ class RecordingStoreMiddleware extends Middleware {
 			return;
 		}
 
-		$file = $this->service->findRecording($owner, $token, $fileName);
+		$service = $this->container->get(AutoShareService::class);
+		$file = $service->findRecording($owner, $token, $fileName);
 		if ($file === null) {
 			$this->logger->info('Stored recording not found', ['token' => $token, 'owner' => $owner, 'fileName' => $fileName]);
 			return;
 		}
 
-		$result = $this->service->shareRecording($file, $owner, $token);
+		$result = $service->shareRecording($file, $owner, $token);
 		// Either way the recording is in the chat, so the "share to chat?" notification is obsolete.
 		if ($result === AutoShareService::RESULT_SHARED || $result === AutoShareService::RESULT_ALREADY_SHARED) {
 			$now = $this->timeFactory->getTime();
-			$this->service->dismissStoredNotification($owner, $token, $this->startedAt ?? $now, $now);
+			$service->dismissStoredNotification($owner, $token, $this->startedAt ?? $now, $now);
 		}
 	}
 }

@@ -12,6 +12,8 @@ class RoomPolicyTest extends TestCase {
 	private const PUBLIC = 3;
 	private const ONE_TO_ONE = 1;
 	private const ONE_TO_ONE_FORMER = 5;
+	private const CHANGELOG = 4;
+	private const NOTE_TO_SELF = 6;
 
 	public function testParseTokens(): void {
 		$this->assertSame(['abc123', 'def456', 'ghi789'], RoomPolicy::parseTokens(" abc123,def456\n\nghi789; abc123 "));
@@ -44,5 +46,13 @@ class RoomPolicyTest extends TestCase {
 		$this->assertTrue($policy->isAllowed('anytoken', self::PUBLIC));
 		$this->assertFalse($policy->isAllowed('anytoken', self::ONE_TO_ONE));
 		$this->assertFalse($policy->isAllowed('anytoken', self::ONE_TO_ONE_FORMER));
+	}
+
+	public function testGroupModeExcludesOtherRoomTypes(): void {
+		$policy = RoomPolicy::fromConfig('group', '');
+
+		$this->assertFalse($policy->isAllowed('anytoken', self::CHANGELOG));
+		$this->assertFalse($policy->isAllowed('anytoken', self::NOTE_TO_SELF));
+		$this->assertFalse($policy->isAllowed('anytoken', 99), 'unknown future room types are excluded');
 	}
 }

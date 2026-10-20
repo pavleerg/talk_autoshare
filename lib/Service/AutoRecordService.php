@@ -8,6 +8,7 @@ use OCA\Talk\Participant;
 use OCA\Talk\Room;
 use OCA\Talk\Service\ParticipantService;
 use OCA\Talk\Service\RecordingService;
+use OCP\IUserManager;
 use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -21,6 +22,7 @@ class AutoRecordService {
 	public function __construct(
 		private ContainerInterface $container,
 		private Configuration $config,
+		private IUserManager $userManager,
 		private LoggerInterface $logger,
 	) {
 	}
@@ -36,15 +38,26 @@ class AutoRecordService {
 		}
 
 		$users = $this->container->get(ParticipantService::class)->getParticipantsByActorType($room, RecordingOwner::ACTOR_USERS);
+		// A disabled or deleted owner could not store the recording, so they never qualify.
+		$starterCandidate = $starter === null ? null : self::candidate($starter);
+		if ($starterCandidate !== null && !$this->isActiveUser($starterCandidate['actorId'])) {
+			$starterCandidate = null;
+		}
 		$owner = RecordingOwner::choose(
-			$starter === null ? null : self::candidate($starter),
-			array_map(self::candidate(...), $users),
+			$starterCandidate,
+			array_values(array_filter(
+				array_map(self::candidate(...), $users),
+				fn (array $candidate): bool => $this->isActiveUser($candidate['actorId']),
+			)),
 		);
 		if ($owner === null) {
 			$this->logger->info('No moderator to own an automatic recording', ['token' => $token]);
 			return;
 		}
 
+		// start() posts to the recording server synchronously (Talk retries up to 3 times), so a slow
+		// server delays the starter's join, just like Talk's own record button. Deliberate: under
+		// mod_php nothing can run after the response is sent, and a cron job would start too late.
 		try {
 			$this->container->get(RecordingService::class)
 				->start($room, Room::RECORDING_VIDEO, $owner['actorId'], $owner['participant']);
@@ -54,6 +67,10 @@ class AutoRecordService {
 			return;
 		}
 		$this->logger->info('Started automatic call recording', ['token' => $token, 'owner' => $owner['actorId']]);
+	}
+
+	private function isActiveUser(string $userId): bool {
+		return $this->userManager->get($userId)?->isEnabled() ?? false;
 	}
 
 	/** @return array{actorType: string, actorId: string, participantType: int, participant: Participant} */
