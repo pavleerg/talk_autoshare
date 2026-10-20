@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
+	<id>talk_autoshare</id>
+	<name>Talk recording auto-share</name>
+	<summary>Automatically shares finished Talk call recordings into the conversation chat</summary>
+	<description><![CDATA[When the Talk recording server uploads a call recording, this app shares it into the
+conversation chat on behalf of the user who started the recording, exactly as if they had clicked
+"Share" on the notification. Only opted-in conversations are handled.
+
+Optionally it starts recording automatically when a call starts, and it records video calls in grid
+view (all participants) instead of Talk's speaker view.
+
+Requires Nextcloud 34 (Hub 26 Spring) with Talk 24.]]></description>
+	<version>0.3.0</version>
+	<licence>agpl</licence>
+	<author>Pavle Ergović</author>
+	<namespace>TalkAutoShare</namespace>
+	<category>social</category>
+	<bugs>https://example.invalid/talk_autoshare/issues</bugs>
+	<dependencies>
+		<nextcloud min-version="34" max-version="34"/>
+	</dependencies>
+	<settings>
+		<admin>OCA\TalkAutoShare\Settings\Admin</admin>
+	</settings>
+</info>
